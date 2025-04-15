@@ -1,6 +1,6 @@
 # blackjack.py
 # Main game file for Blackjack with Pygame
-# Julian Cochran
+# Ibrahim Taha
 # 04.08.2025
 
 import pygame
@@ -15,18 +15,23 @@ pygame.init()
 # Constants
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
-BACKGROUND_COLOR = (0, 100, 0)  # Dark green
+BACKGROUND_COLOR = (0, 0, 139)  # Dark blue
 TEXT_COLOR = (255, 255, 255)  # White
 BUTTON_COLOR = (200, 200, 200)  # Light gray
 BUTTON_HOVER_COLOR = (150, 150, 150)  # Darker gray
 CARD_WIDTH = 100
 CARD_HEIGHT = 145
+WIN_COLOR = (0, 255, 0)  # Green
+LOSS_COLOR = (255, 0, 0)  # Red
 
 # Game states
 STATE_DEALING = 0
 STATE_PLAYER_TURN = 1
 STATE_DEALER_TURN = 2
 STATE_GAME_OVER = 3
+
+
+
 
 
 class BlackjackGame:
@@ -42,8 +47,20 @@ class BlackjackGame:
         self.font = pygame.font.SysFont(None, 36)
         self.small_font = pygame.font.SysFont(None, 24)
 
+        # Add score tracking
+        self.wins = 0
+        self.losses = 0
+
         # Initialize game
         self.reset_game()
+
+        # Initialize game
+        self.reset_game()
+
+        # Add dealer score tracking
+        self.dealer_wins = 0
+        self.dealer_losses = 0
+
 
     def load_card_images(self):
         """Load all card images from the 'img' folder"""
@@ -134,6 +151,7 @@ class BlackjackGame:
         if self.player_hand.is_busted():
             self.game_state = STATE_GAME_OVER
             self.message = "You busted! Dealer wins."
+            self.losses += 1  # Increment loss counter
             self.show_dealer_first_card_only = False
 
     def player_stand(self):
@@ -156,12 +174,19 @@ class BlackjackGame:
 
         if self.dealer_hand.is_busted():
             self.message = "Dealer busted! You win!"
+            self.wins += 1  # Increment player wins
+            self.dealer_losses += 1  # Increment dealer losses
         elif dealer_value > player_value:
             self.message = "Dealer wins!"
+            self.losses += 1  # Increment player losses
+            self.dealer_wins += 1  # Increment dealer wins
         elif player_value > dealer_value:
             self.message = "You win!"
+            self.wins += 1  # Increment player wins
+            self.dealer_losses += 1  # Increment dealer losses
         else:
             self.message = "Push! It's a tie."
+            # No score change for a tie
 
     def draw_card(self, card, x, y, face_up=True):
         """Draw a card at the specified position"""
@@ -210,6 +235,28 @@ class BlackjackGame:
         text_rect = text_surf.get_rect(center=(x + width // 2, y + height // 2))
         self.screen.blit(text_surf, text_rect)
 
+    # Add the new method here
+    def draw_score_counters(self):
+        """Draw the win/loss counters with appropriate colors"""
+        # Create a slightly larger, but not bold font
+        score_font = pygame.font.SysFont(None, 30)
+
+        # Dealer's score (next to dealer area)
+        dealer_win_text = score_font.render(f"Wins: {self.dealer_wins}", True, WIN_COLOR)
+        dealer_loss_text = score_font.render(f"Losses: {self.dealer_losses}", True, LOSS_COLOR)
+
+        # Player's score (next to player area)
+        player_win_text = score_font.render(f"Wins: {self.wins}", True, WIN_COLOR)
+        player_loss_text = score_font.render(f"Losses: {self.losses}", True, LOSS_COLOR)
+
+        # Blit dealer scores next to dealer area
+        self.screen.blit(dealer_win_text, (50, 200))
+        self.screen.blit(dealer_loss_text, (50, 230))
+
+        # Blit player scores next to player area
+        self.screen.blit(player_win_text, (50, 500))
+        self.screen.blit(player_loss_text, (50, 530))
+
     def draw_game(self):
         """Draw the game state"""
         # Fill background
@@ -228,6 +275,9 @@ class BlackjackGame:
 
         self.screen.blit(dealer_text, (50, 10))
         self.screen.blit(player_text, (50, 310))
+
+        # Add this line to call the new method
+        self.draw_score_counters()
 
         # Draw message
         message_text = self.font.render(self.message, True, TEXT_COLOR)
