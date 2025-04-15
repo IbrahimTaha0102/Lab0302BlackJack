@@ -3,6 +3,10 @@
 # Ibrahim Taha
 # 04.08.2025
 
+# flint sessions:
+# https://app.flintk12.com/activity/pygame-debug-le-1fe068/session/625695ce-7526-4dbf-901c-0c48adc46a64
+# https://app.flintk12.com/activity/pygame-debug-le-1fe068/session/89de57f8-b17f-4ace-94cb-b4ad772487ef
+
 import pygame
 import os
 import sys
