@@ -27,6 +27,9 @@ CARD_WIDTH = 100
 CARD_HEIGHT = 145
 WIN_COLOR = (0, 255, 0)  # Green
 LOSS_COLOR = (255, 0, 0)  # Red
+INITIAL_BALANCE = 1000  # Starting money for the player
+MIN_BET = 10
+MAX_BET = 500
 
 # Game states
 STATE_DEALING = 0
@@ -35,11 +38,9 @@ STATE_DEALER_TURN = 2
 STATE_GAME_OVER = 3
 
 
-
-
-
 class BlackjackGame:
     def __init__(self):
+        # Initialize screen first
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Blackjack")
 
@@ -55,15 +56,24 @@ class BlackjackGame:
         self.wins = 0
         self.losses = 0
 
-        # Initialize game
-        self.reset_game()
-
-        # Initialize game
-        self.reset_game()
-
         # Add dealer score tracking
         self.dealer_wins = 0
         self.dealer_losses = 0
+
+        # Add betting-related attributes
+        self.balance = INITIAL_BALANCE
+        self.current_bet = 0
+        self.betting_state = True  # State for betting screen
+
+        # Initialize game state variables
+        self.message = "Place your bet to start"
+        self.show_dealer_first_card_only = True
+        self.game_state = STATE_GAME_OVER  # Start in game over state until bet is placed
+
+        # Initialize deck and hands (these will be reset properly when a game starts)
+        self.deck = Deck()
+        self.player_hand = Hand()
+        self.dealer_hand = Hand()
 
 
     def load_card_images(self):
@@ -130,6 +140,7 @@ class BlackjackGame:
 
     def reset_game(self):
         """Reset the game to its initial state"""
+        # Reset deck and hands
         self.deck = Deck()
         self.deck.shuffle()
 
@@ -156,6 +167,8 @@ class BlackjackGame:
             self.game_state = STATE_GAME_OVER
             self.message = "You busted! Dealer wins."
             self.losses += 1  # Increment loss counter
+            self.dealer_wins += 1  # Increment dealer win counter
+            self.balance -= self.current_bet  # Player loses the bet
             self.show_dealer_first_card_only = False
 
     def player_stand(self):
@@ -165,7 +178,7 @@ class BlackjackGame:
         self.dealer_play()
 
     def dealer_play(self):
-        """Dealer's turn logic"""
+        """Dealer's turn logic with betting outcomes"""
         # Dealer hits until they have 17 or more
         while self.dealer_hand.calculate_value() < 17:
             self.dealer_hand.add_card(self.deck.deal())
@@ -180,17 +193,20 @@ class BlackjackGame:
             self.message = "Dealer busted! You win!"
             self.wins += 1  # Increment player wins
             self.dealer_losses += 1  # Increment dealer losses
+            self.balance += self.current_bet  # Player wins the bet
         elif dealer_value > player_value:
             self.message = "Dealer wins!"
             self.losses += 1  # Increment player losses
             self.dealer_wins += 1  # Increment dealer wins
+            self.balance -= self.current_bet  # Player loses the bet
         elif player_value > dealer_value:
             self.message = "You win!"
             self.wins += 1  # Increment player wins
             self.dealer_losses += 1  # Increment dealer losses
+            self.balance += self.current_bet  # Player wins the bet
         else:
             self.message = "Push! It's a tie."
-            # No score change for a tie
+            # No money change for a tie
 
     def draw_card(self, card, x, y, face_up=True):
         """Draw a card at the specified position"""
@@ -262,7 +278,7 @@ class BlackjackGame:
         self.screen.blit(player_loss_text, (50, 530))
 
     def draw_game(self):
-        """Draw the game state"""
+        """Draw the game state with balance"""
         # Fill background
         self.screen.fill(BACKGROUND_COLOR)
 
@@ -280,7 +296,17 @@ class BlackjackGame:
         self.screen.blit(dealer_text, (50, 10))
         self.screen.blit(player_text, (50, 310))
 
-        # Add this line to call the new method
+        # Draw balance and current bet
+        balance_text = self.font.render(f"Balance: ${self.balance}", True, TEXT_COLOR)
+        balance_width = balance_text.get_width()
+        self.screen.blit(balance_text, (SCREEN_WIDTH - balance_width - 50, 10))
+
+        if self.current_bet > 0:
+            bet_text = self.font.render(f"Current Bet: ${self.current_bet}", True, TEXT_COLOR)
+            bet_width = bet_text.get_width()
+            self.screen.blit(bet_text, (SCREEN_WIDTH - bet_width - 50, 50))
+
+        # Draw score counters
         self.draw_score_counters()
 
         # Draw message
@@ -294,14 +320,73 @@ class BlackjackGame:
         elif self.game_state == STATE_GAME_OVER:
             self.draw_button("Play Again", SCREEN_WIDTH // 2 - 50, 500, 100, 40)
 
+    def draw_betting_screen(self):
+        """Draw the betting screen"""
+        self.screen.fill(BACKGROUND_COLOR)
+
+        # Betting title
+        title_font = pygame.font.SysFont(None, 50)
+        title = title_font.render("Place Your Bet", True, TEXT_COLOR)
+        title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, 100))
+        self.screen.blit(title, title_rect)
+
+        # Balance display
+        balance_font = pygame.font.SysFont(None, 36)
+        balance_text = balance_font.render(f"Balance: ${self.balance}", True, TEXT_COLOR)
+        balance_rect = balance_text.get_rect(center=(SCREEN_WIDTH // 2, 200))
+        self.screen.blit(balance_text, balance_rect)
+
+        # Bet amount display
+        bet_text = balance_font.render(f"Current Bet: ${self.current_bet}", True, TEXT_COLOR)
+        bet_rect = bet_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
+        self.screen.blit(bet_text, bet_rect)
+
+        # Bet buttons
+        bet_amounts = [10, 25, 50, 100]
+        for i, amount in enumerate(bet_amounts):
+            x = SCREEN_WIDTH // 2 - 200 + i * 130
+            y = 350
+            self.draw_button(f"${amount}", x, y, 100, 50)
+
+        # Clear bet button
+        self.draw_button("Clear Bet", SCREEN_WIDTH // 2 - 100, 420, 200, 40)
+
+        # Confirm bet button
+        self.draw_button("Confirm Bet", SCREEN_WIDTH // 2 - 100, 480, 200, 50)
+
+    def handle_betting_input(self, mouse_pos):
+        """Handle betting screen input"""
+        bet_amounts = [10, 25, 50, 100]
+
+        # Check bet amount buttons
+        for i, amount in enumerate(bet_amounts):
+            x = SCREEN_WIDTH // 2 - 200 + i * 130
+            if self.check_button_click(mouse_pos, x, 350, 100, 50):
+                # Ensure bet doesn't exceed balance
+                if self.current_bet + amount <= self.balance:
+                    self.current_bet += amount
+
+        # Clear bet button
+        if self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 - 100, 420, 200, 40):
+            self.current_bet = 0
+
+        # Confirm bet button
+        if self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 - 100, 480, 200, 50):
+            if self.current_bet > 0:
+                self.betting_state = False
+                self.reset_game()
+
     def run(self):
-        """Main game loop"""
+        """Main game loop with betting screen"""
         running = True
         clock = pygame.time.Clock()
 
         while running:
-            # Draw everything
-            self.draw_game()
+            # Handle betting screen or game screen
+            if self.betting_state:
+                self.draw_betting_screen()
+            else:
+                self.draw_game()
 
             # Handle events
             for event in pygame.event.get():
@@ -312,20 +397,25 @@ class BlackjackGame:
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     mouse_pos = pygame.mouse.get_pos()
 
-                    # Check which button was clicked based on game state
-                    if self.game_state == STATE_PLAYER_TURN:
-                        # Hit button
-                        if self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 - 125, 500, 100, 40):
-                            self.player_hit()
+                    if self.betting_state:
+                        # Betting screen input
+                        self.handle_betting_input(mouse_pos)
+                    else:
+                        # Game input logic
+                        if self.game_state == STATE_PLAYER_TURN:
+                            # Hit button
+                            if self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 - 125, 500, 100, 40):
+                                self.player_hit()
 
-                        # Stand button
-                        elif self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 + 25, 500, 100, 40):
-                            self.player_stand()
+                            # Stand button
+                            elif self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 + 25, 500, 100, 40):
+                                self.player_stand()
 
-                    # Play Again button
-                    elif self.game_state == STATE_GAME_OVER:
-                        if self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 - 50, 500, 100, 40):
-                            self.reset_game()
+                        # Play Again button
+                        elif self.game_state == STATE_GAME_OVER:
+                            if self.check_button_click(mouse_pos, SCREEN_WIDTH // 2 - 50, 500, 100, 40):
+                                self.betting_state = True  # Return to betting screen
+                                self.current_bet = 0  # Reset current bet
 
             # Update display
             pygame.display.flip()
